@@ -1,0 +1,17 @@
+# https://coverage.readthedocs.io/en/coverage-5.3/config.html
+[run]
+source =
+    .
+[report]
+exclude_lines =
+    pragma: no cover
+    if DEBUG:
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+fail_under = 85
+show_missing = true
+skip_covered = true
+skip_empty = true
