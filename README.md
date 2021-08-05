@@ -1,5 +1,8 @@
 # Office Addin Sideloader
 
+[![PyPI](https://img.shields.io/pypi/v/oaloader?style=flat-square)](https://pypi.org/project/oaloader/)
+![GitHub](https://img.shields.io/github/license/elonzh/office-addin-sideloader?style=flat-square)
+
 A handy tool to manage your office addins locally,
 you can use it for addin development or deploy your addins for your clients out of AppSource.
 
@@ -14,11 +17,24 @@ you can use it for addin development or deploy your addins for your clients out 
 - Use it as a library.
 - Generate addin installer by single command.
 
+## Installation
+
+### Pre-built releases
+
+If you just use the command line and don't have a python environment,
+download pre-built binary from [GitHub Releases](https://github.com/elonzh/office-addin-sideloader/releases).
+
+### Pypi
+
+```shell
+> pip install oaloader
+```
+
 ## Quick Start
 
 ```shell
 > ./oaloader.exe --help
-Usage: __main__.py [OPTIONS] COMMAND [ARGS]...
+Usage: oaloader.exe [OPTIONS] COMMAND [ARGS]...
 
   Manage your office addins locally.
 
