@@ -1,0 +1,15 @@
+import click
+
+from oaloader import add_manifests
+from oaloader.log import setup_logger
+
+manifests = [
+{%- for manifest in manifests %}
+    {{ manifest|repr }},
+{%- endfor %}
+]
+
+if __name__ == '__main__':
+    setup_logger("WARNING")
+    add_manifests(manifests=manifests)
+    click.pause({{ msg|repr }})
