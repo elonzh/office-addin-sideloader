@@ -150,3 +150,5 @@ tasks_dev.py
 *.xml
 *.ico
 *.png
+*.pdf
+*.zip
