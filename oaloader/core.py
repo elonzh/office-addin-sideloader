@@ -1,47 +1,29 @@
-import os
-import shutil
-import sys
+import re
 import winreg
 from pathlib import Path
+from urllib.request import urlopen
 
-import click
 import pywintypes
 import win32net
 import win32netcon
 import xmltodict
 from loguru import logger
-from tabulate import tabulate
 
-server = None  # Run on local machine.
-subkey = r"Software\Microsoft\Office\16.0\WEF\TrustedCatalogs"
+from .const import default_netname, default_path, manifest_encoding, server, subkey
 
-__version__ = "0.0.1"
-app_name = "office-addin-sideloader"
-app_dir = Path(click.get_app_dir(app_name))
-
-default_path = app_dir.joinpath("addins")
-default_netname = "office-addins"
-
-
-def setup_logger(level: str):
-    level = level.upper()
-    logger.remove()
-    fmt = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-        "<level>{level: <8}</level> | "
-        "<level>{message}</level> - "
-        "{extra}"
-    )
-    logger.add(
-        sys.stdout,
-        level=level,
-        format=fmt,
-    )
-    logger.add(
-        app_dir.joinpath("main.log"),
-        level="DEBUG",
-        format=fmt,
-    )
+__all__ = [
+    "local_server_url",
+    "get_net_shares",
+    "add_net_share",
+    "remove_net_share",
+    "find_catalog",
+    "add_catalog",
+    "remove_catalog",
+    "enum_reg",
+    "load_manifest",
+    "add_manifests",
+    "remove_manifests",
+]
 
 
 def local_server_url(netname):
@@ -61,10 +43,14 @@ def add_net_share(netname: str, path) -> str:
     """
     https://docs.microsoft.com/en-us/windows/win32/api/lmshare/nf-lmshare-netshareadd
     """
-    path = os.path.abspath(path)
+    path = Path(path).absolute()
+    if not path.exists():
+        path.mkdir(parents=True, exist_ok=True)
+
+    path_str = str(path)
     share_info = {
         "netname": netname,
-        "path": path,
+        "path": path_str,
         "type": win32netcon.STYPE_DISKTREE,
         "permissions": win32netcon.ACCESS_READ,
         "remark": "",
@@ -73,7 +59,7 @@ def add_net_share(netname: str, path) -> str:
         "passwd": "",
     }
     url = local_server_url(netname)
-    context_logger = logger.bind(netname=netname, url=url, path=path)
+    context_logger = logger.bind(netname=netname, url=url, path=path_str)
     try:
         win32net.NetShareAdd(server, 2, share_info)
         context_logger.debug("add net share")
@@ -162,82 +148,55 @@ def enum_reg(root):
     return rv
 
 
-def load_manifest(path):
-    path = Path(path)
-    manifest = xmltodict.parse(path.read_text())["OfficeApp"]
+url_pattern = re.compile(
+    r"https?://(www.)?[-a-zA-Z0-9@:%._+~#=]{1,256}.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()!@:%_+.~#?&/=]*)"
+)
+
+
+def is_url(s: str) -> bool:
+    return bool(url_pattern.match(s))
+
+
+def load_manifest(src: str):
+    if is_url(src):
+        logger.bind(url=src).debug("load manifest from url")
+        raw = urlopen(src).read().decode(manifest_encoding)
+    else:
+        raw = Path(src).read_text(encoding=manifest_encoding)
+    data = xmltodict.parse(raw)["OfficeApp"]
     return {
-        "file": path.name,
-        "id": manifest["Id"],  # must have
-        "version": manifest.get("Version"),
-        "provider_name": manifest.get("ProviderName"),
-        "display_name": manifest.get("DisplayName", {}).get("@DefaultValue"),
-        "description": manifest.get("Description", {}).get("@DefaultValue"),
-    }
+        "id": data["Id"],  # must have
+        "version": data.get("Version"),
+        "provider_name": data.get("ProviderName"),
+        "display_name": data.get("DisplayName", {}).get("@DefaultValue"),
+        "description": data.get("Description", {}).get("@DefaultValue"),
+    }, raw
 
 
-opt_netname = click.option(
-    "--netname", "-n", type=click.STRING, default=default_netname
-)
-opt_path = click.option(
-    "--path", "-p", type=click.Path(file_okay=False), default=default_path
-)
-
-
-def use_options(*options):
-    def wrapper(function):
-        for option in reversed(options):
-            function = option(function)
-        return function
-
-    return wrapper
-
-
-@click.group()
-@click.version_option(version=__version__, prog_name=app_name)
-@click.option("--level", "-l", type=click.STRING, default="info", help="log level")
-def cli(level: str):
+def add_manifests(
+    netname=default_netname, path=default_path, hide=False, manifests=tuple()
+):
     """
-    manage your office addins locally.
-    """
-    setup_logger(level)
-
-
-@cli.command()
-@use_options(opt_netname, opt_path)
-@click.option("--hide", is_flag=True, help="hide addins in the catalog")
-@click.argument(
-    "manifests", type=click.Path(exists=True, file_okay=True, dir_okay=False), nargs=-1
-)
-def add(netname, path, hide, manifests):
-    """
-    add manifest to catalog.
+    Register catalog and add manifests, manifests can be file paths or urls.
 
     NOTE: run as admin.
     """
-    path = Path(path)
-    if not path.exists():
-        path.mkdir(parents=True, exist_ok=True)
     url = add_net_share(netname, path)
     root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
     add_catalog(root, url, hide)
 
     for m in manifests:
-        d = load_manifest(m)
+        d, raw = load_manifest(m)
         dst = path.joinpath(f"{d['id']}.xml")
-        shutil.copy(m, dst)
-        logger.bind(src=m, dst=str(dst)).debug("copy manifest")
+        dst.write_text(raw, encoding=manifest_encoding)
+        logger.bind(src=m, dst=str(dst)).debug("add manifest")
 
 
-@cli.command()
-@use_options(opt_netname)
-@click.option("--all", "-a", "rm_all", is_flag=True, help="remove all manifests")
-@click.option("--catalog", "-c", "rm_catalog", is_flag=True, help="remove the catalog")
-@click.argument(
-    "manifests", type=click.Path(exists=True, file_okay=True, dir_okay=False), nargs=-1
-)
-def remove(netname, rm_all, rm_catalog, manifests):
+def remove_manifests(
+    netname=default_netname, rm_all=False, rm_catalog=False, manifests=tuple()
+):
     """
-    remove manifest from catalog.
+    Remove manifest from catalog and manifest can be a file path or url.
 
     NOTE: run as admin.
     """
@@ -246,7 +205,7 @@ def remove(netname, rm_all, rm_catalog, manifests):
     except win32net.error as e:
         # 2310, 'NetShareGetInfo', '共享资源不存在。'
         if e.winerror == 2310:
-            logger.info("net share does not exist")
+            logger.bind(netname=netname).info("net share does not exist")
             return
         raise
     path = Path(share["path"])
@@ -254,7 +213,7 @@ def remove(netname, rm_all, rm_catalog, manifests):
     if rm_all:
         manifests = path.glob("*.xml")
     for m in manifests:
-        d = load_manifest(m)
+        d, _ = load_manifest(str(m))
         dst = path.joinpath(f"{d['id']}.xml")
         dst.unlink(missing_ok=True)
         logger.bind(src=m, dst=str(dst)).debug("remove manifest")
@@ -264,50 +223,3 @@ def remove(netname, rm_all, rm_catalog, manifests):
         url = local_server_url(netname)
         remove_catalog(root, url)
         remove_net_share(netname)
-
-
-def _echo_table(title, table_data):
-    click.secho(title, bold=True, fg="green")
-    if table_data:
-        click.echo(tabulate(table_data, headers="keys"))
-    else:
-        click.secho("Nothing", fg="yellow")
-    click.echo()
-
-
-@cli.command()
-@use_options(opt_path)
-def info(path):
-    """
-    debug sideload status.
-    """
-    root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
-    rv = enum_reg(root)
-    _echo_table(rf"HKEY_CURRENT_USER\{subkey}:", rv)
-
-    urls = []
-    for item in rv:
-        if item["attribute"] == "Url":
-            urls.append(item["value"])
-
-    net_shares = get_net_shares()
-
-    _echo_table("Net Shares:", net_shares)
-
-    url_to_path = {local_server_url(v["netname"]): v["path"] for v in net_shares}
-    paths = set()
-    paths.add(Path(path))
-    for u in urls:
-        p = url_to_path.get(u)
-        if p:
-            paths.add(Path(p))
-
-    for path in paths:
-        addins = []
-        for p in path.glob("*.xml"):
-            addins.append(load_manifest(p))
-        _echo_table(f"Office Addins in `{path}`:", addins)
-
-
-if __name__ == "__main__":
-    cli()
