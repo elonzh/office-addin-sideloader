@@ -35,6 +35,9 @@ def rename_executable(output: str, executable: str):
 
 @task()
 def build(c, executable="oaloader"):
+    """
+    Build oaloader.
+    """
     c: Context
 
     args = nuitka_base_args.copy()
@@ -52,6 +55,9 @@ def installer(
     icon="",
     template="installer.jinja2",
 ):
+    """
+    Build an addin installer.
+    """
     c: Context
     env = jinja2.Environment()
     env.filters["repr"] = repr
