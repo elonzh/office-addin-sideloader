@@ -1,9 +1,11 @@
+import platform
 import re
 import winreg
 from pathlib import Path
 from urllib.request import urlopen
 
 import pywintypes
+import win32com.client
 import win32net
 import win32netcon
 import xmltodict
@@ -23,6 +25,8 @@ __all__ = [
     "load_manifest",
     "add_manifests",
     "remove_manifests",
+    "system_info",
+    "office_installation",
 ]
 
 
@@ -223,3 +227,23 @@ def remove_manifests(
         url = local_server_url(netname)
         remove_catalog(root, url)
         remove_net_share(netname)
+
+
+def system_info():
+    return dict(
+        platform=platform.platform(),
+        system=platform.system(),
+        release=platform.release(),
+        version=platform.version(),
+    )
+
+
+def office_installation(app: str):
+    word = win32com.client.Dispatch(f"{app.capitalize()}.Application")
+    return dict(
+        name=word.Name,
+        version=word.Version,
+        build=word.Build,
+        path=word.Path,
+        startup_path=word.StartupPath,
+    )

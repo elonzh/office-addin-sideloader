@@ -11,7 +11,9 @@ from .core import (
     get_net_shares,
     load_manifest,
     local_server_url,
+    office_installation,
     remove_manifests,
+    system_info,
 )
 from .log import setup_logger
 
@@ -110,6 +112,9 @@ def info(path):
     """
     Debug sideload status.
     """
+    _echo_table("System Info:", [system_info()])
+    _echo_table("Word Installation:", [office_installation("word")])
+
     root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
     rv = enum_reg(root)
     _echo_table(rf"HKEY_CURRENT_USER\{subkey}:", rv)
