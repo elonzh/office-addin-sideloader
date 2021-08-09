@@ -12,12 +12,11 @@ nuitka_base_args = [
     "nuitka",
     "--assume-yes-for-downloads",
     "--onefile",
-    "--output-dir",
-    "build",
+    "--output-dir=build",
+    "--remove-output",
     # Windows Defender will report Trojan:Win32/Sabsik.TE.A!ml
     # when using --nofollow-imports
     # "--nofollow-imports",
-    "--follow-imports",
 ]
 
 
@@ -51,6 +50,7 @@ def installer(
     c,
     manifests,
     msg="Addins are successfully installed. Press any key to continue...",
+    sentry_dsn="",
     executable="addin-installer",
     icon="",
     template="installer.jinja2",
@@ -62,7 +62,7 @@ def installer(
     env = jinja2.Environment()
     env.filters["repr"] = repr
     t = env.from_string(Path(template).read_text())
-    script = t.render(manifests=manifests, msg=msg)
+    script = t.render(manifests=manifests, msg=msg, sentry_dsn=sentry_dsn)
 
     p = Path(f"installer_{hashlib.md5(script.encode()).hexdigest()[:8]}").with_suffix(
         ".py"
@@ -71,6 +71,7 @@ def installer(
     args = nuitka_base_args.copy()
     args.extend(
         [
+            "--include-package=sentry_sdk",
             "--windows-uac-admin",
         ]
     )

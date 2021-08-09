@@ -1,6 +1,14 @@
-import click
+import getpass
 
-from oaloader import add_manifests
+import click
+import sentry_sdk
+from loguru import logger
+from sentry_sdk.integrations.atexit import AtexitIntegration
+from sentry_sdk.integrations.dedupe import DedupeIntegration
+from sentry_sdk.integrations.excepthook import ExcepthookIntegration
+
+from oaloader import add_manifests, office_installation
+from oaloader.core import system_info
 from oaloader.log import setup_logger
 
 manifests = [
@@ -9,7 +17,37 @@ manifests = [
 {%- endfor %}
 ]
 
-if __name__ == '__main__':
+
+def breadcrumb_sink(message):
+    record = message.record
+    sentry_sdk.add_breadcrumb(
+        category=record["name"],
+        level=record["level"].name,
+        message=record["message"],
+        extra=record["extra"],
+    )
+
+
+if __name__ == "__main__":
     setup_logger("WARNING")
+    logger.add(breadcrumb_sink)
+
+    sentry_sdk.init(
+        {{ sentry_dsn|repr }},
+        send_default_pii=True,
+        auto_enabling_integrations=False,
+        integrations=(
+            ExcepthookIntegration(),
+            DedupeIntegration(),
+            AtexitIntegration(),
+        ),
+    )
+    sentry_sdk.set_user(dict(
+        username=getpass.getuser(),
+        ip_address="{%- raw -%}{{auto}}{%- endraw -%}",
+    ))
+    sentry_sdk.set_context("System Info", system_info())
+    sentry_sdk.set_context("Word Installation", office_installation("word"))
+
     add_manifests(manifests=manifests)
     click.pause({{ msg|repr }})
