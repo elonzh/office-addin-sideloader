@@ -49,11 +49,13 @@ def build(c, executable="oaloader"):
 def installer(
     c,
     manifests,
-    msg="Addins are successfully installed. Press any key to continue...",
+    success_msg="Addins are successfully installed. Press any key to continue...",
+    fail_msg="Can't find Office 16 registry key, do you have a valid Microsoft installation?",
     sentry_dsn="",
     executable="addin-installer",
     icon="",
     template="installer.jinja2",
+    dry=False,
 ):
     """
     Build an addin installer.
@@ -62,7 +64,12 @@ def installer(
     env = jinja2.Environment()
     env.filters["repr"] = repr
     t = env.from_string(Path(template).read_text())
-    script = t.render(manifests=manifests, msg=msg, sentry_dsn=sentry_dsn)
+    script = t.render(
+        manifests=manifests,
+        success_msg=success_msg,
+        fail_msg=fail_msg,
+        sentry_dsn=sentry_dsn,
+    )
 
     p = Path(f"installer_{hashlib.md5(script.encode()).hexdigest()[:8]}").with_suffix(
         ".py"
@@ -83,6 +90,9 @@ def installer(
             ]
         )
     args.append(str(p))
-    r: Result = c.run(" ".join(args))
-    rename_executable(r.stdout, executable)
-    p.unlink(missing_ok=True)
+    r: Result = c.run(" ".join(args), dry=dry)
+    if dry:
+        print(f"Dry run mode, delete file {p!s} manually")
+    else:
+        rename_executable(r.stdout, executable)
+        p.unlink(missing_ok=True)

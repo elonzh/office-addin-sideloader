@@ -185,8 +185,9 @@ def add_manifests(
 
     NOTE: run as admin.
     """
-    url = add_net_share(netname, path)
+    # open register key first make sure the office installation exists
     root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
+    url = add_net_share(netname, path)
     add_catalog(root, url, hide)
 
     for m in manifests:

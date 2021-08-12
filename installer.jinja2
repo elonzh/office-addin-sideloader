@@ -49,5 +49,13 @@ if __name__ == "__main__":
     sentry_sdk.set_context("System Info", system_info())
     sentry_sdk.set_context("Word Installation", office_installation("word"))
 
-    add_manifests(manifests=manifests)
-    click.pause({{ msg|repr }})
+    try:
+        add_manifests(manifests=manifests)
+        click.pause(
+            {{ success_msg|repr }}
+        )
+    except FileNotFoundError:
+        click.pause(
+            {{ fail_msg|repr }}
+        )
+

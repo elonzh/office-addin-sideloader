@@ -115,18 +115,28 @@ def info(path):
     _echo_table("System Info:", [system_info()])
     _echo_table("Word Installation:", [office_installation("word")])
 
-    root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
+    net_shares = get_net_shares()
+    _echo_table("Net Shares:", net_shares)
+
+    title = rf"HKEY_CURRENT_USER\{subkey}:"
+    try:
+        root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
+    except FileNotFoundError:
+        click.secho(title, fg="green")
+        raise click.ClickException(
+            click.style(
+                "Can't find Office 16 registry key, do you have a valid Microsoft installation?",
+                fg="yellow",
+            )
+        )
+
     rv = enum_reg(root)
-    _echo_table(rf"HKEY_CURRENT_USER\{subkey}:", rv)
+    _echo_table(title, rv)
 
     urls = []
     for item in rv:
         if item["attribute"] == "Url":
             urls.append(item["value"])
-
-    net_shares = get_net_shares()
-
-    _echo_table("Net Shares:", net_shares)
 
     url_to_path = {local_server_url(v["netname"]): v["path"] for v in net_shares}
     paths = set()
