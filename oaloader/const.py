@@ -2,7 +2,7 @@ from pathlib import Path
 
 import click
 
-version = "0.2.1"
+version = "0.3.0"
 server = None  # Run on local machine.
 subkey = r"Software\Microsoft\Office\16.0\WEF\TrustedCatalogs"
 app_name = "office-addin-sideloader"

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "oaloader"
-version = "0.2.1"
+version = "0.3.0"
 license = "MIT"
 description = "A handy tool to manage your office addins locally, you can use it for addin development or deploy your addins for your clients out of AppSource."
 authors = ["elonzh <elonzh@qq.com>"]
