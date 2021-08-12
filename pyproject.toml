@@ -33,7 +33,7 @@ url = "https://mirrors.cloud.tencent.com/pypi/simple/"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pywin32 = ">=301"
+pywin32 = "^300"
 click = "^7.1.2"
 tabulate = "^0.8.9"
 xmltodict = "^0.12.0"
