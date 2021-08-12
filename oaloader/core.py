@@ -239,11 +239,23 @@ def system_info():
 
 
 def office_installation(app: str):
-    word = win32com.client.Dispatch(f"{app.capitalize()}.Application")
-    return dict(
-        name=word.Name,
-        version=word.Version,
-        build=word.Build,
-        path=word.Path,
-        startup_path=word.StartupPath,
-    )
+    try:
+        word = win32com.client.Dispatch(f"{app.capitalize()}.Application")
+        return dict(
+            name=word.Name,
+            version=word.Version,
+            build=word.Build,
+            path=word.Path,
+            startup_path=word.StartupPath,
+        )
+    except pywintypes.com_error as e:
+        # pywintypes.com_error: (-2147221005, '无效的类字符串', None, None)
+        if e.hresult == -2147221005:
+            return dict(
+                name="Unknown",
+                version="Unknown",
+                build="Unknown",
+                path="Unknown",
+                startup_path="Unknown",
+            )
+        raise
