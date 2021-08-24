@@ -1,21 +1,11 @@
 import getpass
 
-import click
 import sentry_sdk
-from loguru import logger
 from sentry_sdk.integrations.atexit import AtexitIntegration
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.integrations.excepthook import ExcepthookIntegration
 
-from oaloader import add_manifests, office_installation
-from oaloader.core import system_info
-from oaloader.log import setup_logger
-
-manifests = [
-{%- for manifest in manifests %}
-    {{ manifest|repr }},
-{%- endfor %}
-]
+from oaloader import office_installation, system_info
 
 
 def breadcrumb_sink(message):
@@ -28,12 +18,9 @@ def breadcrumb_sink(message):
     )
 
 
-if __name__ == "__main__":
-    setup_logger("WARNING")
-    logger.add(breadcrumb_sink)
-
+def setup_sentry(sentry_dsn: str):
     sentry_sdk.init(
-        {{ sentry_dsn|repr }},
+        sentry_dsn,
         send_default_pii=True,
         auto_enabling_integrations=False,
         integrations=(
@@ -42,20 +29,11 @@ if __name__ == "__main__":
             AtexitIntegration(),
         ),
     )
-    sentry_sdk.set_user(dict(
-        username=getpass.getuser(),
-        ip_address="{%- raw -%}{{auto}}{%- endraw -%}",
-    ))
+    sentry_sdk.set_user(
+        dict(
+            username=getpass.getuser(),
+            ip_address="{{auto}}",
+        )
+    )
     sentry_sdk.set_context("System Info", system_info())
     sentry_sdk.set_context("Word Installation", office_installation("word"))
-
-    try:
-        add_manifests(manifests=manifests)
-        click.pause(
-            {{ success_msg|repr }}
-        )
-    except FileNotFoundError:
-        click.pause(
-            {{ fail_msg|repr }}
-        )
-

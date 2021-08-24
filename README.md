@@ -10,12 +10,13 @@ you can use it for addin development or deploy your addins for your clients out 
 
 ## Features
 
-- Add or remove Office Addin locally.
+- Add or remove Office Add-in locally.
 - Support local or url manifest source.
 - Debug sideload status and list manifest info.
 - Single binary without any dependency.
 - Use it as a library.
-- Generate addin installer by single command.
+- Generate add-in installer/uninstaller with [sentry](https://sentry.io) support by single command.
+- Support fixing add-in [APP ERROR](https://docs.microsoft.com/en-us/office365/troubleshoot/installation/cannot-install-office-add-in) and [clearing cache](https://docs.microsoft.com/en-us/office/dev/add-ins/testing/clear-cache).
 
 ## Installation
 
@@ -32,9 +33,9 @@ download pre-built binary from [GitHub Releases](https://github.com/elonzh/offic
 
 ## Quick Start
 
-```shell
+```text
 > ./oaloader.exe --help
-Usage: oaloader.exe [OPTIONS] COMMAND [ARGS]...
+Usage:  [OPTIONS] COMMAND [ARGS]...
 
   Manage your office addins locally.
 
@@ -46,6 +47,8 @@ Options:
 Commands:
   add     Register catalog and add manifests, manifests can be file paths
           or...
+
+  fix     Try fixing `APP ERROR` when starting up add-ins.
   info    Debug sideload status.
   remove  Remove manifest from catalog and manifest can be a file path or...
 ```
@@ -57,6 +60,10 @@ Commands:
 3. Run `poetry run invoke installer -m <YOUR-ADDIN-MANIFEST-URL>` to build your own installer.
 
 If your want customize the installer, just edit `installer.jinja2` or write your own installer with `oaloader` module.
+
+## Build an Addin uninstaller
+
+Just using invoke `uninstaller` task like `installer` above.
 
 ## How it works
 

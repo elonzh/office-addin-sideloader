@@ -45,21 +45,17 @@ def build(c, executable="oaloader"):
     rename_executable(r.stdout, executable)
 
 
-@task(iterable=["manifests"])
-def installer(
+def make_executable(
     c,
+    template,
     manifests,
-    success_msg="Addins are successfully installed. Press any key to continue...",
-    fail_msg="Can't find Office 16 registry key, do you have a valid Microsoft installation?",
+    success_msg,
+    fail_msg,
     sentry_dsn="",
-    executable="addin-installer",
+    executable="addin-executable",
     icon="",
-    template="installer.jinja2",
     dry=False,
 ):
-    """
-    Build an addin installer.
-    """
     c: Context
     env = jinja2.Environment()
     env.filters["repr"] = repr
@@ -71,7 +67,7 @@ def installer(
         sentry_dsn=sentry_dsn,
     )
 
-    p = Path(f"installer_{hashlib.md5(script.encode()).hexdigest()[:8]}").with_suffix(
+    p = Path(f"executable_{hashlib.md5(script.encode()).hexdigest()[:8]}").with_suffix(
         ".py"
     )
     p.write_text(script, encoding="utf-8")
@@ -80,6 +76,7 @@ def installer(
         [
             "--include-package=sentry_sdk",
             "--windows-uac-admin",
+            # "--windows-disable-console",
         ]
     )
     if icon:
@@ -93,6 +90,64 @@ def installer(
     r: Result = c.run(" ".join(args), dry=dry)
     if dry:
         print(f"Dry run mode, delete file {p!s} manually")
+        return executable
     else:
-        rename_executable(r.stdout, executable)
+        e = rename_executable(r.stdout, executable)
         p.unlink(missing_ok=True)
+        return e
+
+
+@task(iterable=["manifests"])
+def installer(
+    c,
+    manifests,
+    success_msg="Addins are successfully installed. Press any key to continue...",
+    fail_msg="Operation failed, do you have a valid Microsoft installation?",
+    sentry_dsn="",
+    executable="addin-installer",
+    icon="",
+    template="bin/installer.jinja2",
+    dry=False,
+):
+    """
+    Build an addin installer.
+    """
+    return make_executable(
+        c,
+        template=template,
+        manifests=manifests,
+        success_msg=success_msg,
+        fail_msg=fail_msg,
+        sentry_dsn=sentry_dsn,
+        executable=executable,
+        icon=icon,
+        dry=dry,
+    )
+
+
+@task(iterable=["manifests"])
+def uninstaller(
+    c,
+    manifests,
+    success_msg="Addins are successfully uninstalled. Press any key to continue...",
+    fail_msg="Operation failed, do you have a valid Microsoft installation?",
+    sentry_dsn="",
+    executable="addin-uninstaller",
+    icon="",
+    template="bin/uninstaller.jinja2",
+    dry=False,
+):
+    """
+    Build an addin uninstaller.
+    """
+    return make_executable(
+        c,
+        template=template,
+        manifests=manifests,
+        success_msg=success_msg,
+        fail_msg=fail_msg,
+        sentry_dsn=sentry_dsn,
+        executable=executable,
+        icon=icon,
+        dry=dry,
+    )

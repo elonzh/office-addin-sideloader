@@ -2,7 +2,7 @@ import sys
 
 from loguru import logger
 
-from .const import app_dir
+from .const import APP_DIR
 
 
 def setup_logger(level: str):
@@ -20,7 +20,7 @@ def setup_logger(level: str):
         format=fmt,
     )
     logger.add(
-        app_dir.joinpath("main.log"),
+        APP_DIR.joinpath("main.log"),
         level="DEBUG",
         format=fmt,
     )

@@ -4,10 +4,19 @@ from pathlib import Path
 import click
 from tabulate import tabulate
 
-from .const import app_name, default_netname, default_path, subkey, version
+from .const import (
+    APP_NAME,
+    DEFAULT_NETNAME,
+    DEFAULT_PATH,
+    SUBKEY_CATALOG,
+    SUBKEY_PROVIDER,
+    version,
+)
 from .core import (
     add_manifests,
+    clear_cache,
     enum_reg,
+    fix_app_error,
     get_net_shares,
     load_manifest,
     local_server_url,
@@ -23,15 +32,15 @@ opt_netname = click.option(
     "--netname",
     "-n",
     type=click.STRING,
-    default=default_netname,
+    default=DEFAULT_NETNAME,
     show_default=True,
-    help="NETNAME represents a share folder or a office addin catalog.",
+    help="NETNAME represents a share folder or a office add-in catalog.",
 )
 opt_path = click.option(
     "--path",
     "-p",
     type=click.Path(file_okay=False),
-    default=default_path,
+    default=DEFAULT_PATH,
     show_default=True,
     help="The directory stores manifests and is shared as NETNAME.",
 )
@@ -52,7 +61,7 @@ def use_decorators(*decorators):
 
 
 @click.group()
-@click.version_option(version=version, prog_name=app_name)
+@click.version_option(version=version, prog_name=APP_NAME)
 @click.option(
     "--level",
     "-l",
@@ -63,14 +72,14 @@ def use_decorators(*decorators):
 )
 def cli(level: str):
     """
-    Manage your office addins locally.
+    Manage your office add-ins locally.
     """
     setup_logger(level)
 
 
 @cli.command()
 @use_decorators(opt_netname, opt_path)
-@click.option("--hide", is_flag=True, help="Hide addins in the catalog.")
+@click.option("--hide", is_flag=True, help="Hide add-ins in the catalog.")
 @use_decorators(arg_manifests)
 def add(netname, path, hide, manifests):
     """
@@ -79,6 +88,7 @@ def add(netname, path, hide, manifests):
     NOTE: run as admin.
     """
     add_manifests(netname, path, hide, manifests)
+    clear_cache()
 
 
 @cli.command()
@@ -95,6 +105,16 @@ def remove(netname, rm_all, rm_catalog, manifests):
     NOTE: run as admin.
     """
     remove_manifests(netname, rm_all, rm_catalog, manifests)
+    clear_cache()
+
+
+@cli.command()
+def fix():
+    """
+    Try fixing `APP ERROR` when starting up add-ins.
+    """
+    fix_app_error()
+    clear_cache()
 
 
 def _echo_table(title, table_data):
@@ -106,21 +126,9 @@ def _echo_table(title, table_data):
     click.echo()
 
 
-@cli.command()
-@use_decorators(opt_path)
-def info(path):
-    """
-    Debug sideload status.
-    """
-    _echo_table("System Info:", [system_info()])
-    _echo_table("Word Installation:", [office_installation("word")])
-
-    net_shares = get_net_shares()
-    _echo_table("Net Shares:", net_shares)
-
-    title = rf"HKEY_CURRENT_USER\{subkey}:"
+def _safe_open_key(title, sub_key, key=winreg.HKEY_CURRENT_USER):
     try:
-        root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
+        return winreg.OpenKey(key, sub_key)
     except FileNotFoundError:
         click.secho(title, fg="green")
         raise click.ClickException(
@@ -130,7 +138,30 @@ def info(path):
             )
         )
 
-    rv = enum_reg(root)
+
+@cli.command()
+@use_decorators(opt_path)
+def info(path):
+    """
+    Debug sideload status.
+    """
+
+    _echo_table("System Info:", [system_info()])
+    _echo_table("Word Installation:", [office_installation("word")])
+
+    net_shares = get_net_shares()
+    _echo_table("Net Shares:", net_shares)
+
+    title = rf"HKEY_CURRENT_USER\{SUBKEY_PROVIDER}:"
+    rv = filter(
+        lambda v: v["attribute"] == "UniqueId",
+        enum_reg(_safe_open_key(title, SUBKEY_PROVIDER)),
+    )
+
+    _echo_table(title, rv)
+
+    title = rf"HKEY_CURRENT_USER\{SUBKEY_CATALOG}:"
+    rv = enum_reg(_safe_open_key(title, SUBKEY_CATALOG))
     _echo_table(title, rv)
 
     urls = []
@@ -151,4 +182,4 @@ def info(path):
         for p in path.glob("*.xml"):
             d, _ = load_manifest(str(p))
             addins.append(d)
-        _echo_table(f"Office Addins in `{path}`:", addins)
+        _echo_table(f"Office Add-ins in `{path}`:", addins)

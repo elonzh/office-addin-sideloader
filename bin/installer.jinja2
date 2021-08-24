@@ -1,0 +1,28 @@
+import sentry_sdk
+import win32ui
+from loguru import logger
+
+from bin.sentry import setup_sentry, breadcrumb_sink
+from oaloader import add_manifests, fix_app_error, clear_cache
+from oaloader.log import setup_logger
+
+manifests = [
+{%- for manifest in manifests %}
+    {{ manifest|repr }},
+{%- endfor %}
+]
+
+if __name__ == "__main__":
+    setup_logger("WARNING")
+    logger.add(breadcrumb_sink)
+    setup_sentry({{ sentry_dsn|repr }})
+    try:
+        fix_app_error()
+        clear_cache()
+        add_manifests(manifests=manifests)
+        msg = {{ success_msg|repr }}
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        msg = {{ fail_msg|repr }}
+    win32ui.MessageBox(msg, "")
+

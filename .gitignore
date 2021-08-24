@@ -145,7 +145,7 @@ cython_debug/
 
 .idea
 *.iml
-installer*.py
+executable_*.py
 tasks_dev.py
 *.xml
 *.ico

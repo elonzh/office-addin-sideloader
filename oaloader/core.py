@@ -1,5 +1,7 @@
+import os
 import platform
 import re
+import shutil
 import winreg
 from pathlib import Path
 from urllib.request import urlopen
@@ -11,7 +13,7 @@ import win32netcon
 import xmltodict
 from loguru import logger
 
-from .const import default_netname, default_path, manifest_encoding, server, subkey
+from . import const
 
 __all__ = [
     "local_server_url",
@@ -27,6 +29,8 @@ __all__ = [
     "remove_manifests",
     "system_info",
     "office_installation",
+    "fix_app_error",
+    "clear_cache",
 ]
 
 
@@ -37,7 +41,7 @@ def local_server_url(netname):
 
 
 def get_net_shares(share_type=win32netcon.STYPE_DISKTREE):
-    net_shares, _, _ = win32net.NetShareEnum(server, 2)
+    net_shares, _, _ = win32net.NetShareEnum(None, 2)
     if share_type is not None:
         net_shares = list(filter(lambda v: v["type"] == share_type, net_shares))
     return net_shares
@@ -65,7 +69,7 @@ def add_net_share(netname: str, path) -> str:
     url = local_server_url(netname)
     context_logger = logger.bind(netname=netname, url=url, path=path_str)
     try:
-        win32net.NetShareAdd(server, 2, share_info)
+        win32net.NetShareAdd(None, 2, share_info)
         context_logger.debug("add net share")
     except win32net.error as e:
         #  (2118, 'NetShareAdd', '名称已经共享。')
@@ -76,7 +80,7 @@ def add_net_share(netname: str, path) -> str:
 
 
 def remove_net_share(netname: str):
-    rv = win32net.NetShareDel(server, netname)
+    rv = win32net.NetShareDel(None, netname)
     logger.bind(netname=netname).debug("remove net share")
     return rv
 
@@ -127,21 +131,18 @@ def enum_reg(root):
             else:
                 raise
 
-    rv = []
     for key in keys:
         k = winreg.OpenKey(root, key)
         i = 0
         while True:
             try:
                 a, v, t = winreg.EnumValue(k, i)
-                rv.append(
-                    {
-                        "key": key,
-                        "attribute": a,
-                        "value": v,
-                        "type": t,
-                    }
-                )
+                yield {
+                    "key": key,
+                    "attribute": a,
+                    "value": v,
+                    "type": t,
+                }
                 i += 1
             except winreg.error as e:
                 # [WinError 259] 没有可用的数据了。
@@ -149,7 +150,6 @@ def enum_reg(root):
                     break
                 else:
                     raise
-    return rv
 
 
 url_pattern = re.compile(
@@ -164,9 +164,9 @@ def is_url(s: str) -> bool:
 def load_manifest(src: str):
     if is_url(src):
         logger.bind(url=src).debug("load manifest from url")
-        raw = urlopen(src).read().decode(manifest_encoding)
+        raw = urlopen(src).read().decode(const.MANIFEST_ENCODING)
     else:
-        raw = Path(src).read_text(encoding=manifest_encoding)
+        raw = Path(src).read_text(encoding=const.MANIFEST_ENCODING)
     data = xmltodict.parse(raw)["OfficeApp"]
     return {
         "id": data["Id"],  # must have
@@ -178,7 +178,10 @@ def load_manifest(src: str):
 
 
 def add_manifests(
-    netname=default_netname, path=default_path, hide=False, manifests=tuple()
+    netname=const.DEFAULT_NETNAME,
+    path=const.DEFAULT_PATH,
+    hide=False,
+    manifests=tuple(),
 ):
     """
     Register catalog and add manifests, manifests can be file paths or urls.
@@ -186,19 +189,19 @@ def add_manifests(
     NOTE: run as admin.
     """
     # open register key first make sure the office installation exists
-    root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
+    root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, const.SUBKEY_CATALOG)
     url = add_net_share(netname, path)
     add_catalog(root, url, hide)
 
     for m in manifests:
         d, raw = load_manifest(m)
         dst = path.joinpath(f"{d['id']}.xml")
-        dst.write_text(raw, encoding=manifest_encoding)
+        dst.write_text(raw, encoding=const.MANIFEST_ENCODING)
         logger.bind(src=m, dst=str(dst)).debug("add manifest")
 
 
 def remove_manifests(
-    netname=default_netname, rm_all=False, rm_catalog=False, manifests=tuple()
+    netname=const.DEFAULT_NETNAME, rm_all=False, rm_catalog=False, manifests=tuple()
 ):
     """
     Remove manifest from catalog and manifest can be a file path or url.
@@ -206,7 +209,7 @@ def remove_manifests(
     NOTE: run as admin.
     """
     try:
-        share = win32net.NetShareGetInfo(server, netname, 2)
+        share = win32net.NetShareGetInfo(None, netname, 2)
     except win32net.error as e:
         # 2310, 'NetShareGetInfo', '共享资源不存在。'
         if e.winerror == 2310:
@@ -224,10 +227,57 @@ def remove_manifests(
         logger.bind(src=m, dst=str(dst)).debug("remove manifest")
 
     if rm_catalog:
-        root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey)
+        root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, const.SUBKEY_CATALOG)
         url = local_server_url(netname)
         remove_catalog(root, url)
         remove_net_share(netname)
+
+
+def fix_app_error():
+    """
+    https://docs.microsoft.com/en-us/office365/troubleshoot/installation/cannot-install-office-add-in
+    """
+    try:
+        root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, const.SUBKEY_PROVIDER)
+    except FileNotFoundError:
+        logger.bind(subykey=const.SUBKEY_PROVIDER).debug("subkey not found")
+        return
+
+    for v in enum_reg(root):
+        if v["attribute"] == "UniqueId" and (
+            v["value"] == "Anonymous" or v["value"].endswith("_ADAL")
+        ):
+            k = rf"{const.SUBKEY_CATALOG}\{v['key']}"
+            logger.bind(subykey=k, attribute=v["attribute"], value=v["value"]).debug(
+                "delete invalid key"
+            )
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, k)
+
+
+def clear_cache():
+    """
+    https://docs.microsoft.com/en-us/office/dev/add-ins/testing/clear-cache
+    """
+    paths = [
+        Path(os.getenv("LOCALAPPDATA")).joinpath(r"Microsoft\Office\16.0\Wef"),
+        Path(os.getenv("USERPROFILE")).joinpath(
+            r"AppData\Local\Packages\Microsoft.Win32WebViewHost_cw5n1h2txyewy\AC\#!123\INetCache"
+        ),
+    ]
+
+    def onerror(func, path, exc_info):
+        log = logger.bind(func=func, path=path, exc_info=exc_info)
+        level = "WARNING"
+        if exc_info[0] == FileNotFoundError:
+            level = "DEBUG"
+        log.log(level, "rmtree failed")
+
+    for p in paths:
+        logger.bind(path=str(p)).debug("rmtree")
+        shutil.rmtree(
+            p,
+            onerror=onerror,
+        )
 
 
 def system_info():
@@ -242,16 +292,18 @@ def system_info():
 def office_installation(app: str):
     try:
         word = win32com.client.Dispatch(f"{app.capitalize()}.Application")
+        # some attrs may not exist
         return dict(
-            name=word.Name,
-            version=word.Version,
-            build=word.Build,
-            path=word.Path,
-            startup_path=word.StartupPath,
+            name=getattr(word, "Name", "Unknown"),
+            version=getattr(word, "Version", "Unknown"),
+            build=getattr(word, "Build", "Unknown"),
+            path=getattr(word, "Path", "Unknown"),
+            startup_path=getattr(word, "StartupPath", "Unknown"),
         )
     except pywintypes.com_error as e:
-        # pywintypes.com_error: (-2147221005, '无效的类字符串', None, None)
-        if e.hresult == -2147221005:
+        # com_error: (-2147221005, '无效的类字符串', None, None)
+        # com_error: (-2146959355, '服务器运行失败', None, None)
+        if e.hresult in (-2147221005, -2146959355):
             return dict(
                 name="Unknown",
                 version="Unknown",
