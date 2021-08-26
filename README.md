@@ -57,7 +57,8 @@ Commands:
 
 1. Install [Poetry](https://python-poetry.org/docs/).
 2. Run `poetry install` to prepare environment.
-3. Run `poetry run invoke installer -m <YOUR-ADDIN-MANIFEST-URL>` to build your own installer.
+3. Checkout [Nuitka Requirements](https://nuitka.net/doc/user-manual.html#requirements) and install a C compiler.
+4. Run `poetry run invoke installer -m <YOUR-ADDIN-MANIFEST-URL>` to build your own installer.
 
 If your want customize the installer, just edit `installer.jinja2` or write your own installer with `oaloader` module.
 
@@ -65,6 +66,18 @@ If your want customize the installer, just edit `installer.jinja2` or write your
 
 Just using invoke `uninstaller` task like `installer` above.
 
-## How it works
+## FAQ
+
+### How it works?
 
 https://docs.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins
+
+### Get error like `ImportError: DLL load failed while importing win32xxx` when import pywin32 module.
+
+Try this solution:
+
+1. Open a terminal as Administrator
+2. Get your virtualenv path by running `poetry env info`
+3. Run `poetry run python <virtualenv path>/.venv/Scripts/pywin32_postinstall.py -install`
+
+see https://github.com/mhammond/pywin32/issues/1431#issuecomment-548584385 for more details.
