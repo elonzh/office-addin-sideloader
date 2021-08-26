@@ -247,7 +247,7 @@ def fix_app_error():
         if v["attribute"] == "UniqueId" and (
             v["value"] == "Anonymous" or v["value"].endswith("_ADAL")
         ):
-            k = rf"{const.SUBKEY_CATALOG}\{v['key']}"
+            k = rf"{const.SUBKEY_PROVIDER}\{v['key']}"
             logger.bind(subykey=k, attribute=v["attribute"], value=v["value"]).debug(
                 "delete invalid key"
             )
