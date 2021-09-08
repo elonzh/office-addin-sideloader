@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2021-09-08
+### Changed
+-  Exception in `fix_app_error` and `clear_cache` will be captured silently.
+### Fixed
+- Fix setting sentry breadcrumb data wrongly.
+
 ## [0.4.1] - 2021-08-26
 ### Changed
 - `setup_sentry` now `set_tag` about office installation and use default integrations.

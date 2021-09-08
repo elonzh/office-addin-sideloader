@@ -19,10 +19,12 @@ if __name__ == "__main__":
     setup_sentry({{ sentry_dsn|repr }})
     try:
         clear_cache()
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+    try:
         remove_manifests(manifests=manifests)
         msg = {{ success_msg|repr }}
     except Exception as e:
         sentry_sdk.capture_exception(e)
         msg = {{ fail_msg|repr }}
     win32ui.MessageBox(msg, f"v{version}")
-

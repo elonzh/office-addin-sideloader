@@ -20,10 +20,12 @@ if __name__ == "__main__":
     try:
         fix_app_error()
         clear_cache()
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+    try:
         add_manifests(manifests=manifests)
         msg = {{ success_msg|repr }}
     except Exception as e:
         sentry_sdk.capture_exception(e)
         msg = {{ fail_msg|repr }}
     win32ui.MessageBox(msg, f"v{version}")
-
