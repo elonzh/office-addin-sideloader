@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "oaloader"
-version = "0.4.2"
+version = "0.4.3"
 license = "MIT"
 description = "A handy tool to manage your office addins locally, you can use it for addin development or deploy your addins for your clients out of AppSource."
 authors = ["elonzh <elonzh@qq.com>"]
@@ -38,9 +38,10 @@ click = "^7.1.2"
 tabulate = "^0.8.9"
 xmltodict = "^0.12.0"
 loguru = "^0.5.3"
+requests = "^2.26.0"
 
 [tool.poetry.dev-dependencies]
-Nuitka = { git = "git@github.com:Nuitka/Nuitka.git", branch = "develop" }
+Nuitka = "^0.6.17"
 black = "^20.8b1"
 flake8 = "^3.9.0"
 flake8-bugbear = "^21.4.3"

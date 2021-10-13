@@ -4,9 +4,9 @@ import re
 import shutil
 import winreg
 from pathlib import Path
-from urllib.request import urlopen
 
 import pywintypes
+import requests
 import win32com.client
 import win32net
 import win32netcon
@@ -164,7 +164,7 @@ def is_url(s: str) -> bool:
 def load_manifest(src: str):
     if is_url(src):
         logger.bind(url=src).debug("load manifest from url")
-        raw = urlopen(src).read().decode(const.MANIFEST_ENCODING)
+        raw = requests.get(src).content.decode(const.MANIFEST_ENCODING)
     else:
         raw = Path(src).read_text(encoding=const.MANIFEST_ENCODING)
     data = xmltodict.parse(raw)["OfficeApp"]

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import click
 
-version = "0.4.2"
+version = "0.4.3"
 
 SUBKEY_CATALOG = r"Software\Microsoft\Office\16.0\WEF\TrustedCatalogs"
 SUBKEY_PROVIDER = r"Software\Microsoft\Office\16.0\WEF\Providers"
