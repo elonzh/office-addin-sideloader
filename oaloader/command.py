@@ -1,4 +1,3 @@
-import winreg
 from pathlib import Path
 
 import click
@@ -8,8 +7,9 @@ from .const import (
     APP_NAME,
     DEFAULT_NETNAME,
     DEFAULT_PATH,
-    SUBKEY_CATALOG,
-    SUBKEY_PROVIDER,
+    OFFICE_SUBKEY_CATALOG,
+    OFFICE_SUBKEY_PROVIDER,
+    SUBKEY_OFFICE,
     version,
 )
 from .core import (
@@ -21,6 +21,7 @@ from .core import (
     load_manifest,
     local_server_url,
     office_installation,
+    open_office_sub_key,
     remove_manifests,
     system_info,
 )
@@ -126,9 +127,9 @@ def _echo_table(title, table_data):
     click.echo()
 
 
-def _safe_open_key(title, sub_key, key=winreg.HKEY_CURRENT_USER):
+def _safe_open_key(title, sub_key):
     try:
-        return winreg.OpenKey(key, sub_key)
+        return open_office_sub_key(sub_key)
     except FileNotFoundError:
         click.secho(title, fg="green")
         raise click.ClickException(
@@ -152,16 +153,16 @@ def info(path):
     net_shares = get_net_shares()
     _echo_table("Net Shares:", net_shares)
 
-    title = rf"HKEY_CURRENT_USER\{SUBKEY_PROVIDER}:"
+    title = rf"HKEY_CURRENT_USER\{SUBKEY_OFFICE}\{OFFICE_SUBKEY_PROVIDER}:"
     rv = filter(
         lambda v: v["attribute"] == "UniqueId",
-        enum_reg(_safe_open_key(title, SUBKEY_PROVIDER)),
+        enum_reg(_safe_open_key(title, OFFICE_SUBKEY_PROVIDER)),
     )
 
     _echo_table(title, rv)
 
-    title = rf"HKEY_CURRENT_USER\{SUBKEY_CATALOG}:"
-    rv = enum_reg(_safe_open_key(title, SUBKEY_CATALOG))
+    title = rf"HKEY_CURRENT_USER\{SUBKEY_OFFICE}\{OFFICE_SUBKEY_CATALOG}:"
+    rv = enum_reg(_safe_open_key(title, OFFICE_SUBKEY_CATALOG))
     _echo_table(title, rv)
 
     urls = []

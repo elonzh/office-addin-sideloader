@@ -23,6 +23,7 @@ __all__ = [
     "find_catalog",
     "add_catalog",
     "remove_catalog",
+    "open_office_sub_key",
     "enum_reg",
     "load_manifest",
     "add_manifests",
@@ -117,6 +118,14 @@ def remove_catalog(root, url: str):
         logger.bind(key=_id, url=url).debug("remove catalog")
 
 
+def open_office_sub_key(sub_key):
+    # open office key first make sure the office installation exists
+    office_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, const.SUBKEY_OFFICE)
+    catalog_key = winreg.CreateKey(office_key, sub_key)
+    winreg.CloseKey(office_key)
+    return catalog_key
+
+
 def enum_reg(root):
     keys = []
     i = 0
@@ -188,8 +197,7 @@ def add_manifests(
 
     NOTE: run as admin.
     """
-    # open register key first make sure the office installation exists
-    root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, const.SUBKEY_CATALOG)
+    root = open_office_sub_key(const.OFFICE_SUBKEY_CATALOG)
     url = add_net_share(netname, path)
     add_catalog(root, url, hide)
 
@@ -227,7 +235,7 @@ def remove_manifests(
         logger.bind(src=m, dst=str(dst)).debug("remove manifest")
 
     if rm_catalog:
-        root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, const.SUBKEY_CATALOG)
+        root = open_office_sub_key(const.OFFICE_SUBKEY_CATALOG)
         url = local_server_url(netname)
         remove_catalog(root, url)
         remove_net_share(netname)
@@ -237,21 +245,16 @@ def fix_app_error():
     """
     https://docs.microsoft.com/en-us/office365/troubleshoot/installation/cannot-install-office-add-in
     """
-    try:
-        root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, const.SUBKEY_PROVIDER)
-    except FileNotFoundError:
-        logger.bind(subykey=const.SUBKEY_PROVIDER).debug("subkey not found")
-        return
-
+    root = open_office_sub_key(const.OFFICE_SUBKEY_PROVIDER)
     for v in enum_reg(root):
         if v["attribute"] == "UniqueId" and (
             v["value"] == "Anonymous" or v["value"].endswith("_ADAL")
         ):
-            k = rf"{const.SUBKEY_PROVIDER}\{v['key']}"
+            k = v["key"]
             logger.bind(subykey=k, attribute=v["attribute"], value=v["value"]).debug(
-                "delete invalid key"
+                "delete invalid provider key"
             )
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, k)
+            winreg.DeleteKey(root, k)
 
 
 def clear_cache():
